@@ -21,15 +21,16 @@ load_dotenv()
 
 project_file_path = "../myproject.yml"
 serena_agent = SerenaAgent(project_file_path, start_language_server=True)
+toolkit = SerenaAgnoToolkit(serena_agent)
 
-model = Claude(id="claude-3-7-sonnet-20250219")
-# model = Gemini(id="gemini-2.5-pro-exp-03-25")
+# model = Claude(id="claude-3-7-sonnet-20250219")
+model = Gemini(id="gemini-2.5-pro-exp-03-25")
 
 agno_agent = Agent(
     name="Serena",
     model=model,
     description="A fully-featured coding assistant",
-    tools=[SerenaAgnoToolkit(serena_agent)],  # type: ignore
+    tools=[toolkit],  # type: ignore
     show_tool_calls=False,
     markdown=True,
     system_message="",  # Todo

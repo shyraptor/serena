@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 
 from agno.tools import Function, Toolkit
 
@@ -17,16 +16,16 @@ class SerenaAgnoToolkit(Toolkit):
 
     @staticmethod
     def _create_agno_function(tool: Tool) -> Function:
-        def entrypoint(**kwargs: Any) -> str:
-            if "kwargs" in kwargs:
-                # Agno sometimes passes a kwargs argument explicitly, so we merge it
-                kwargs.update(kwargs["kwargs"])
-                del kwargs["kwargs"]
-            log.info(f"Calling tool {tool}")
-            return tool.apply_ex(log_call=True, catch_exceptions=True, **kwargs)
+        # def entrypoint(**kwargs: Any) -> str:
+        #     if "kwargs" in kwargs:
+        #         # Agno sometimes passes a kwargs argument explicitly, so we merge it
+        #         kwargs.update(kwargs["kwargs"])
+        #         del kwargs["kwargs"]
+        #     log.info(f"Calling tool {tool}")
+        #     return tool.apply_ex(log_call=True, catch_exceptions=True, **kwargs)
 
         function = Function.from_callable(tool.get_apply_fn())
         function.name = tool.get_name()
-        function.entrypoint = entrypoint
+        # function.entrypoint = entrypoint
         function.show_result = True
         return function

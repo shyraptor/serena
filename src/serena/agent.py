@@ -257,9 +257,7 @@ class ReadFileTool(Tool):
     Reads a file within the project directory.
     """
 
-    def apply(
-        self, relative_path: str, start_line: int = 0, end_line: int | None = None, max_answer_chars: int = _DEFAULT_MAX_ANSWER_LENGTH
-    ) -> str:
+    def apply(self, relative_path: str, start_line: int = 0, end_line: int = -1, max_answer_chars: int = _DEFAULT_MAX_ANSWER_LENGTH) -> str:
         """
         Reads the given file or a chunk of it (between start_line and end_line). Generally, symbolic operations
         like find_symbol or find_referencing_symbols should be preferred if you know which symbols you are looking for.
@@ -267,16 +265,19 @@ class ReadFileTool(Tool):
 
         :param relative_path: the relative path to the file to read
         :param start_line: the start line of the range to read
-        :param end_line: the end line of the range to read. If None, the entire file will be read.
+        :param end_line: the end line of the range to read. If not passed, the entire file will be read.
         :param max_answer_chars: if the file (chunk) is longer than this number of characters,
             no content will be returned. Don't adjust unless there is really no other way to get the content
             required for the task.
         :return: the full text of the file at the given relative path
         """
+        if end_line == -1:
+            end_line = None  # type: ignore
+
         result = self.language_server.retrieve_full_file_content(relative_path)
         result_lines = result.splitlines()
         if end_line is None:
-            result_lines = result_lines[start_line:]
+            result_lines = result_lines[start_line:]  # type: ignore
         else:
             result_lines = result_lines[start_line:end_line]
         result = "\n".join(result_lines)
@@ -384,10 +385,10 @@ class FindSymbolTool(Tool):
         name: str,
         depth: int = 0,
         include_body: bool = False,
-        include_kinds: list[int] | None = None,
-        exclude_kinds: list[int] | None = None,
+        include_kinds: list[int] = [],  # noqa: B006
+        exclude_kinds: list[int] = [],  # noqa: B006
         substring_matching: bool = False,
-        dir_relative_path: str | None = None,
+        dir_relative_path: str = "",
         max_answer_chars: int = _DEFAULT_MAX_ANSWER_LENGTH,
     ) -> str:
         """
@@ -422,6 +423,11 @@ class FindSymbolTool(Tool):
             make a stricter query.
         :return: a list of symbols (with symbol locations) that match the given name in JSON format
         """
+        if include_kinds == []:
+            include_kinds = None  # type: ignore
+        if exclude_kinds == []:
+            exclude_kinds = None  # type: ignore
+
         include_kinds = cast(list[SymbolKind] | None, include_kinds)
         exclude_kinds = cast(list[SymbolKind] | None, exclude_kinds)
         symbols = self.symbol_manager.find_by_name(
@@ -448,8 +454,8 @@ class FindReferencingSymbolsTool(Tool):
         line: int,
         column: int,
         include_body: bool = False,
-        include_kinds: list[int] | None = None,
-        exclude_kinds: list[int] | None = None,
+        include_kinds: list[int] = [],  # noqa: B006
+        exclude_kinds: list[int] = [],  # noqa: B006
         max_answer_chars: int = _DEFAULT_MAX_ANSWER_LENGTH,
     ) -> str:
         """
@@ -475,6 +481,11 @@ class FindReferencingSymbolsTool(Tool):
             make a stricter query.
         :return: a list of JSON objects with the symbols referencing the requested symbol
         """
+        if include_kinds == []:
+            include_kinds = None  # type: ignore
+        if exclude_kinds == []:
+            exclude_kinds = None  # type: ignore
+
         include_kinds = cast(list[SymbolKind] | None, include_kinds)
         exclude_kinds = cast(list[SymbolKind] | None, exclude_kinds)
         symbols = self.symbol_manager.find_referencing_symbols(
@@ -806,8 +817,8 @@ class SearchInAllCodeTool(Tool):
         pattern: str,
         context_lines_before: int = 0,
         context_lines_after: int = 0,
-        paths_include_glob: str | None = None,
-        paths_exclude_glob: str | None = None,
+        paths_include_glob: str = "",
+        paths_exclude_glob: str = "",
         max_answer_chars: int = _DEFAULT_MAX_ANSWER_LENGTH,
     ) -> str:
         """
@@ -827,6 +838,10 @@ class SearchInAllCodeTool(Tool):
             make a stricter query.
         :return: A JSON object mapping file paths to lists of matched consecutive lines (with context, if requested).
         """
+        if paths_include_glob == "":
+            paths_include_glob = None  # type: ignore
+        if paths_exclude_glob == "":
+            paths_exclude_glob = None  # type: ignore
         matches = self.language_server.search_files_for_pattern(
             pattern=pattern,
             context_lines_before=context_lines_before,
@@ -851,7 +866,7 @@ class ExecuteShellCommandTool(Tool):
     def apply(
         self,
         command: str,
-        cwd: str | None = None,
+        cwd: str = "",
         capture_stderr: bool = True,
         max_answer_chars: int = _DEFAULT_MAX_ANSWER_LENGTH,
     ) -> str:
@@ -867,7 +882,7 @@ class ExecuteShellCommandTool(Tool):
         Never execute unsafe shell commands like `rm -rf /` or similar! Generally be very careful with deletions.
 
         :param command: the shell command to execute
-        :param cwd: the working directory to execute the command in. If None, the project root will be used.
+        :param cwd: the working directory to execute the command in. If not passed, the project root will be used.
         :param capture_stderr: whether to capture and return stderr output
         :param max_answer_chars: if the output is longer than this number of characters,
             no content will be returned. Don't adjust unless there is really no other way to get the content
