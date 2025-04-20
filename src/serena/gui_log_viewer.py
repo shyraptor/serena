@@ -54,6 +54,10 @@ class GuiLogViewer:
             LogLevel.DEFAULT: "#000000",  # Black
         }
 
+        # Search related variables
+        self.search_results = []
+        self.current_search_index = -1
+
     def print_status(self, s):
         print(s + "\n", file=sys.stderr)
 
@@ -197,6 +201,67 @@ class GuiLogViewer:
             if self.running:
                 self.root.after(100, self._process_queue)
 
+    def _perform_search(self, event=None): # event=None allows binding to <Return>
+        """Perform text search in the log widget."""
+        search_term = self.search_entry.get()
+        self._clear_search() # Clear previous results first
+
+        if not search_term:
+            return
+
+        self.text_widget.configure(state=tk.NORMAL)
+        self.search_results = []
+        start_index = "1.0"
+        while True:
+            pos = self.text_widget.search(search_term, start_index, stopindex=tk.END, nocase=True)
+            if not pos:
+                break
+            end_index = f"{pos}+{len(search_term)}c"
+            self.text_widget.tag_add("SEARCH_HIGHLIGHT", pos, end_index)
+            self.search_results.append(pos)
+            start_index = end_index
+
+        self.text_widget.configure(state=tk.DISABLED)
+
+        if self.search_results:
+            self.current_search_index = 0
+            self._goto_search_result(self.current_search_index)
+        else:
+            self.current_search_index = -1
+
+    def _find_next(self):
+        """Navigate to the next search result."""
+        if not self.search_results:
+            return
+        self.current_search_index = (self.current_search_index + 1) % len(self.search_results)
+        self._goto_search_result(self.current_search_index)
+
+    def _find_previous(self):
+        """Navigate to the previous search result."""
+        if not self.search_results:
+            return
+        self.current_search_index = (self.current_search_index - 1 + len(self.search_results)) % len(self.search_results)
+        self._goto_search_result(self.current_search_index)
+
+    def _clear_search(self):
+        """Clear search highlights and results."""
+        self.text_widget.configure(state=tk.NORMAL)
+        self.text_widget.tag_remove("SEARCH_HIGHLIGHT", "1.0", tk.END)
+        self.text_widget.configure(state=tk.DISABLED)
+        self.search_results = []
+        self.current_search_index = -1
+
+    def _goto_search_result(self, index):
+        """Scrolls to and highlights the search result at the given index."""
+        if 0 <= index < len(self.search_results):
+            pos = self.search_results[index]
+            self.text_widget.see(pos)
+            # Optionally, add temporary emphasis to the current match (e.g., different background)
+            # self.text_widget.tag_remove("CURRENT_SEARCH", "1.0", tk.END)
+            # end_pos = f"{pos}+{len(self.search_entry.get())}c"
+            # self.text_widget.tag_add("CURRENT_SEARCH", pos, end_pos)
+            # self.text_widget.tag_configure("CURRENT_SEARCH", background="yellow")
+
     def run_gui(self):
         """Run the GUI"""
         self.running = True
@@ -207,9 +272,10 @@ class GuiLogViewer:
 
             # Make the window resizable
             self.root.columnconfigure(0, weight=1)
-            # We now have two rows - one for logo and one for text
+            # We now have three rows - logo, search, text
             self.root.rowconfigure(0, weight=0)  # Logo row
-            self.root.rowconfigure(1, weight=1)  # Text content row
+            self.root.rowconfigure(1, weight=0)  # Search row
+            self.root.rowconfigure(2, weight=1)  # Text content row
 
             # Load and display the logo image
             try:
@@ -223,23 +289,48 @@ class GuiLogViewer:
             except Exception as e:
                 print(f"Error loading logo image: {e}", file=sys.stderr)
 
+            # Create frame for search widgets
+            search_frame = tk.Frame(self.root)
+            search_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=2)
+            search_frame.columnconfigure(1, weight=1) # Make entry expand
+
+            search_label = tk.Label(search_frame, text="Search:")
+            search_label.grid(row=0, column=0, padx=(0, 5))
+
+            self.search_entry = tk.Entry(search_frame)
+            self.search_entry.grid(row=0, column=1, sticky="ew")
+            self.search_entry.bind("<Return>", self._perform_search) # Search on Enter key
+
+            search_button = tk.Button(search_frame, text="Search", command=self._perform_search)
+            search_button.grid(row=0, column=2, padx=(5, 2))
+
+            prev_button = tk.Button(search_frame, text="Previous", command=self._find_previous)
+            prev_button.grid(row=0, column=3, padx=(2, 2))
+
+            next_button = tk.Button(search_frame, text="Next", command=self._find_next)
+            next_button.grid(row=0, column=4, padx=(2, 2))
+
+            clear_button = tk.Button(search_frame, text="Clear", command=self._clear_search)
+            clear_button.grid(row=0, column=5, padx=(2, 0))
+
+
             # Create frame to hold text widget and scrollbars
-            frame = tk.Frame(self.root)
-            frame.grid(row=1, column=0, sticky="nsew")
-            frame.columnconfigure(0, weight=1)
-            frame.rowconfigure(0, weight=1)
+            text_frame = tk.Frame(self.root)
+            text_frame.grid(row=2, column=0, sticky="nsew") # Changed from row=1
+            text_frame.columnconfigure(0, weight=1)
+            text_frame.rowconfigure(0, weight=1)
 
             # Create horizontal scrollbar
-            h_scrollbar = tk.Scrollbar(frame, orient=tk.HORIZONTAL)
+            h_scrollbar = tk.Scrollbar(text_frame, orient=tk.HORIZONTAL)
             h_scrollbar.grid(row=1, column=0, sticky="ew")
 
             # Create vertical scrollbar
-            v_scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL)
+            v_scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL)
             v_scrollbar.grid(row=0, column=1, sticky="ns")
 
             # Create text widget with horizontal scrolling
             self.text_widget = tk.Text(
-                frame, wrap=tk.NONE, width=self.width, height=self.height, xscrollcommand=h_scrollbar.set, yscrollcommand=v_scrollbar.set
+                text_frame, wrap=tk.NONE, width=self.width, height=self.height, xscrollcommand=h_scrollbar.set, yscrollcommand=v_scrollbar.set
             )
             self.text_widget.grid(row=0, column=0, sticky="nsew")
             self.text_widget.configure(state=tk.DISABLED)  # Make it read-only
@@ -254,6 +345,9 @@ class GuiLogViewer:
 
             # Configure tag for tool names
             self.text_widget.tag_configure("TOOL_NAME", background="#ffff00")
+
+            # Configure tag for search highlights
+            self.text_widget.tag_configure("SEARCH_HIGHLIGHT", background="#add8e6") # Light blue background
 
             # Set up the queue processing
             self.root.after(100, self._process_queue)
