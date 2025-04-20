@@ -79,11 +79,15 @@ class ProjectConfig(ToStringMixin):
     def __init__(self, config_dict: dict[str, Any], project_name: str, project_root: Path | None = None):
         self.project_name: str = project_name
         if "language" in config_dict and "default_language" not in config_dict:
-            log.warning(f"Project config for '{project_name}' uses deprecated key 'language'. Please rename it to 'default_language'.")
-            config_dict["default_language"] = config_dict.pop("language")
-        if "default_language" not in config_dict:
-             raise SerenaConfigError(f"'default_language' key not found in configuration of project '{project_name}'.")
-        self.default_language: Language = Language(config_dict["default_language"])
+             # Add backward compatibility or warning if needed
+             log.warning(f"Configuration key 'language' is deprecated for project '{project_name}'. Please use 'default_language' instead.")
+             lang_key = "language"
+        elif "default_language" in config_dict:
+             lang_key = "default_language"
+        else:
+             raise SerenaConfigError(f"Missing required configuration key 'default_language' in project '{project_name}'.")
+
+        self.language: Language = Language(config_dict[lang_key])
         if project_root is None:
             project_root = Path(config_dict["project_root"])
         self.project_root: str = str(project_root.resolve())
@@ -352,7 +356,7 @@ class SerenaAgent:
 
         # instantiate and start the language server
         assert self.project_config is not None
-        multilspy_config = MultilspyConfig(code_language=self.project_config.default_language, ignored_paths=self.project_config.ignored_paths)
+        multilspy_config = MultilspyConfig(code_language=self.project_config.language, ignored_paths=self.project_config.ignored_paths)
         ls_logger = MultilspyLogger()
         self.language_server = SyncLanguageServer.create(
             multilspy_config,
@@ -365,7 +369,7 @@ class SerenaAgent:
             self._current_lsp_language = None
             raise RuntimeError(f"Failed to start the language server for {self.project_config}")
         else:
-            self._current_lsp_language = self.project_config.default_language
+            self._current_lsp_language = self.project_config.language
 
     def _restart_lsp_with_language(self, target_language: Language) -> bool:
         """Restarts the language server for the current project but using the specified target language.
@@ -535,11 +539,11 @@ class Component(ABC):
         if not self.project_config.enable_dynamic_lsp_switching:
             log.debug("Dynamic LSP switching disabled for this project. Checking if default server is running.")
             if not self.agent.is_language_server_running():
-                log.error(f"Language server (default: {self.project_config.default_language.name}) is not running and dynamic switching is disabled.")
+                log.error(f"Language server (default: {self.project_config.language.name}) is not running and dynamic switching is disabled.")
                 return False
             # Check if the running server matches the default language (it should, unless something went wrong)
-            if self.agent._current_lsp_language != self.project_config.default_language:
-                 log.warning(f"Language server is running but with unexpected language '{self.agent._current_lsp_language}' instead of default '{self.project_config.default_language.name}'. Proceeding anyway as dynamic switching is off.")
+            if self.agent._current_lsp_language != self.project_config.language:
+                 log.warning(f"Language server is running but with unexpected language '{self.agent._current_lsp_language}' instead of default '{self.project_config.language.name}'. Proceeding anyway as dynamic switching is off.")
             return True # Default server is running (or at least *a* server is running)
 
         if not relative_path:

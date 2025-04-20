@@ -12,7 +12,7 @@ project_root: /path/to/project
 #
 # Special requirements:
 #  * csharp: Requires the presence of a .sln file in the project folder.
-language: python
+default_language: python
 
 # Whether to enable dynamic language server switching within this project.
 # If true, when a tool operates on a file with a supported language extension (e.g., .py, .ts, .java)
