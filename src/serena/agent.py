@@ -371,7 +371,7 @@ class SerenaAgent:
         else:
             self._current_lsp_language = self.project_config.language
 
-    def _restart_lsp_with_language(self, target_language: Language) -> bool:
+    def restart_lsp_with_language(self, target_language: Language) -> bool:
         """Restarts the language server for the current project but using the specified target language.
 
         Args:
@@ -527,7 +527,7 @@ class Component(ABC):
         assert self.agent.lines_read is not None
         return self.agent.lines_read
 
-    def _ensure_language_server_for_file(self, relative_path: str | Path) -> bool:
+    def ensure_language_server_for_file(self, relative_path: str | Path) -> bool:
         """Checks if the active project language matches the file's language.
         If not, and dynamic switching is enabled, attempts to restart LSP for the target language.
 
@@ -579,7 +579,7 @@ class Component(ABC):
             log.info(f"Language server not running. Attempting to start for target language '{target_language.name}'.")
 
         # Attempt to restart the LSP server with the target language
-        restart_successful = self.agent._restart_lsp_with_language(target_language)
+        restart_successful = self.agent.restart_lsp_with_language(target_language)
 
         if not restart_successful:
             log.error(f"Failed to ensure language server is running for {target_language.name}.")
@@ -847,7 +847,7 @@ class GetSymbolsOverviewTool(Tool):
             (e.g. a subdirectory).
         :return: a JSON object mapping relative paths of all contained files to info about top-level symbols in the file (name, kind, line, column).
         """
-        if not self._ensure_language_server_for_file(relative_path):
+        if not self.ensure_language_server_for_file(relative_path):
             language_name = get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping).name if get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping) else "the target file's language"
             return f"Error: Could not ensure language server for {language_name} (path: '{relative_path}'). No matching project found or activation failed."
         
@@ -914,14 +914,14 @@ class FindSymbolTool(Tool):
         """
         # Determine the relevant path for language check
         check_path = within_relative_path # Can be None
-        if not self._ensure_language_server_for_file(check_path):
+        if not self.ensure_language_server_for_file(check_path):
              # Decide how to handle failure: Proceed with warning, or return error?
              # Returning error for now, as symbol search likely won't work well.
              language_name = get_language_from_file_path(check_path, self.agent.serena_config.dynamic_language_mapping).name if check_path and get_language_from_file_path(check_path, self.agent.serena_config.dynamic_language_mapping) else "the target file's language"
              if check_path and get_language_from_file_path(check_path, self.agent.serena_config.dynamic_language_mapping):
                 return f"Error: Could not ensure language server for {language_name} (path: '{check_path}'). No matching project found or activation failed."
              else:
-                # Case where language couldn't be determined, but _ensure... still returned false (e.g. server not running)
+                # Case where language couldn't be determined, but ensure... still returned false (e.g. server not running)
                 return f"Error: Language server not ready for the current project '{self.project_config.project_name}'."
         
         include_kinds = cast(list[SymbolKind] | None, include_kinds)
@@ -981,7 +981,7 @@ class FindReferencingSymbolsTool(Tool):
             make a stricter query.
         :return: a list of JSON objects with the symbols referencing the requested symbol
         """
-        if not self._ensure_language_server_for_file(relative_path):
+        if not self.ensure_language_server_for_file(relative_path):
             language_name = get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping).name if get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping) else "the target file's language"
             return f"Error: Could not ensure language server for {language_name} (path: '{relative_path}'). No matching project found or activation failed."
         
@@ -1034,7 +1034,7 @@ class FindReferencingCodeSnippetsTool(Tool):
             required for the task. Instead, if the output is too long, you should
             make a stricter query.
         """
-        if not self._ensure_language_server_for_file(relative_path):
+        if not self.ensure_language_server_for_file(relative_path):
             language_name = get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping).name if get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping) else "the target file's language"
             return f"Error: Could not ensure language server for {language_name} (path: '{relative_path}'). No matching project found or activation failed."
         
@@ -1068,7 +1068,7 @@ class ReplaceSymbolBodyTool(Tool, ToolMarkerCanEdit):
         :param body: the new symbol body. Important: Provide the correct level of indentation
             (as the original body). Note that the first line must not be indented (i.e. no leading spaces).
         """
-        if not self._ensure_language_server_for_file(relative_path):
+        if not self.ensure_language_server_for_file(relative_path):
             language_name = get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping).name if get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping) else "the target file's language"
             return f"Error: Could not ensure language server for {language_name} (path: '{relative_path}'). No matching project found or activation failed."
         
@@ -1100,7 +1100,7 @@ class InsertAfterSymbolTool(Tool, ToolMarkerCanEdit):
         :param column: the column
         :param body: the body/content to be inserted
         """
-        if not self._ensure_language_server_for_file(relative_path):
+        if not self.ensure_language_server_for_file(relative_path):
             language_name = get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping).name if get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping) else "the target file's language"
             return f"Error: Could not ensure language server for {language_name} (path: '{relative_path}'). No matching project found or activation failed."
         
@@ -1134,7 +1134,7 @@ class InsertBeforeSymbolTool(Tool, ToolMarkerCanEdit):
         :param column: the column
         :param body: the body/content to be inserted
         """
-        if not self._ensure_language_server_for_file(relative_path):
+        if not self.ensure_language_server_for_file(relative_path):
             language_name = get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping).name if get_language_from_file_path(relative_path, self.agent.serena_config.dynamic_language_mapping) else "the target file's language"
             return f"Error: Could not ensure language server for {language_name} (path: '{relative_path}'). No matching project found or activation failed."
 
